@@ -1,0 +1,9 @@
+{
+  "name": "Salient Object Polygon Segmentor",
+  "task_type": "salient_poly",
+  "version": "0.1.0",
+  "root": "salient-poly/dist",
+  "css": ["assets/index.css"],
+  "js": ["assets/index.js"],
+  "result_schema_version": "1.0.0"
+}
