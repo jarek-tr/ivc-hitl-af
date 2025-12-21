@@ -8,9 +8,12 @@ from .models import Task
 
 FRONTENDS_DIR = Path(__file__).resolve().parent.parent.parent / "frontends"
 
+
 def annotate_task_shell(request, task_id: int):
     """Minimal HTML shell that loads a registered frontend plugin bundle."""
-    task = get_object_or_404(Task.objects.select_related("task_definition__task_type"), pk=task_id)
+    task = get_object_or_404(
+        Task.objects.select_related("task_definition__task_type"), pk=task_id
+    )
     tt = task.task_definition.task_type
     plugin = getattr(tt, "plugin", None)
     if not plugin or not plugin.is_active:
@@ -24,8 +27,12 @@ def annotate_task_shell(request, task_id: int):
     js_files = manifest.get("js", [])
 
     # Serve plugin assets through Django to keep deployment simple.
-    css_tags = "\n".join([f'<link rel="stylesheet" href="plugin/{escape(p)}">' for p in css_files])
-    js_tags = "\n".join([f'<script type="module" src="plugin/{escape(p)}"></script>' for p in js_files])
+    css_tags = "\n".join(
+        [f'<link rel="stylesheet" href="plugin/{escape(p)}">' for p in css_files]
+    )
+    js_tags = "\n".join(
+        [f'<script type="module" src="plugin/{escape(p)}"></script>' for p in js_files]
+    )
 
     boot = {
         "taskId": task.id,
@@ -33,24 +40,27 @@ def annotate_task_shell(request, task_id: int):
     }
 
     html = f"""<!doctype html>
-<html>
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Annotate #{task.id} — {escape(tt.slug)}</title>
-{css_tags}
-</head>
-<body>
-<div id="root"></div>
-<script>window.__IVC_BOOT__ = {json.dumps(boot)};</script>
-{js_tags}
-</body>
-</html>
-"""
+            <html>
+            <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>Annotate #{task.id} — {escape(tt.slug)}</title>
+            {css_tags}
+            </head>
+            <body>
+            <div id="root"></div>
+            <script>window.__IVC_BOOT__ = {json.dumps(boot)};</script>
+            {js_tags}
+            </body>
+            </html>
+        """
     return HttpResponse(html)
 
+
 def plugin_asset(request, task_id: int, asset_path: str):
-    task = get_object_or_404(Task.objects.select_related("task_definition__task_type"), pk=task_id)
+    task = get_object_or_404(
+        Task.objects.select_related("task_definition__task_type"), pk=task_id
+    )
     tt = task.task_definition.task_type
     plugin = getattr(tt, "plugin", None)
     if not plugin or not plugin.is_active:
@@ -71,20 +81,25 @@ def plugin_asset(request, task_id: int, asset_path: str):
     mime = mime or "application/octet-stream"
     return HttpResponse(safe_file.read_bytes(), content_type=mime)
 
+
 def mturk_annotate_task(request, task_id: int):
     """MTurk-compatible wrapper.
     MTurk appends query params like assignmentId, hitId, workerId.
     We render the same plugin shell but provide `mturk` metadata so the plugin (or wrapper)
     can submit back to MTurk.
     """
-    task = get_object_or_404(Task.objects.select_related("task_definition__task_type"), pk=task_id)
+    task = get_object_or_404(
+        Task.objects.select_related("task_definition__task_type"), pk=task_id
+    )
     assignment_id = request.GET.get("assignmentId", "")
     hit_id = request.GET.get("hitId", "")
     worker_id = request.GET.get("workerId", "")
     sandbox = request.GET.get("sandbox", "1") == "1"
 
     # MTurk uses a fixed submit URL pattern.
-    submit_host = "https://www.mturk.com" if not sandbox else "https://workersandbox.mturk.com"
+    submit_host = (
+        "https://www.mturk.com" if not sandbox else "https://workersandbox.mturk.com"
+    )
     submit_url = f"{submit_host}/mturk/externalSubmit"
 
     tt = task.task_definition.task_type
@@ -99,8 +114,12 @@ def mturk_annotate_task(request, task_id: int):
     css_files = manifest.get("css", [])
     js_files = manifest.get("js", [])
 
-    css_tags = "\n".join([f'<link rel="stylesheet" href="plugin/{escape(p)}">' for p in css_files])
-    js_tags = "\n".join([f'<script type="module" src="plugin/{escape(p)}"></script>' for p in js_files])
+    css_tags = "\n".join(
+        [f'<link rel="stylesheet" href="plugin/{escape(p)}">' for p in css_files]
+    )
+    js_tags = "\n".join(
+        [f'<script type="module" src="plugin/{escape(p)}"></script>' for p in js_files]
+    )
 
     boot = {
         "taskId": task.id,

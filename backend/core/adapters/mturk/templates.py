@@ -1,5 +1,6 @@
 from xml.sax.saxutils import escape
 
+
 def external_question_xml(url: str, frame_height: int = 900) -> str:
     """Build MTurk ExternalQuestion XML for hosted UIs."""
     safe = escape(url, {'"': "&quot;"})

@@ -1,33 +1,67 @@
 import uuid
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
-from .models import Project, Asset, TaskType, TaskDefinition, Task, Annotation, FrontendPlugin, Assignment
+from .models import (
+    Project,
+    Asset,
+    TaskType,
+    TaskDefinition,
+    Task,
+    Annotation,
+    FrontendPlugin,
+    Assignment,
+)
 from .plugin_validation import validate_plugin_manifest
+
 
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ["id", "slug", "name", "description", "created_at"]
 
+
 class AssetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Asset
-        fields = ["id", "project", "media_type", "s3_key", "sha256", "width", "height", "metadata", "created_at"]
+        fields = [
+            "id",
+            "project",
+            "media_type",
+            "s3_key",
+            "sha256",
+            "width",
+            "height",
+            "metadata",
+            "created_at",
+        ]
+
 
 class TaskTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = TaskType
         fields = ["id", "slug", "name", "description"]
 
+
 class TaskDefinitionSerializer(serializers.ModelSerializer):
     class Meta:
         model = TaskDefinition
         fields = ["id", "task_type", "version", "definition", "created_at"]
 
+
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
-        fields = ["id", "project", "asset", "task_definition", "status", "priority", "payload", "created_at"]
+        fields = [
+            "id",
+            "project",
+            "asset",
+            "task_definition",
+            "status",
+            "priority",
+            "payload",
+            "created_at",
+        ]
+
 
 class AnnotationSerializer(serializers.ModelSerializer):
     submission_id = serializers.CharField(required=False, allow_blank=True)
@@ -61,7 +95,9 @@ class AnnotationSerializer(serializers.ModelSerializer):
         assignment = attrs.get("assignment")
         task = attrs.get("task")
         if assignment and task and assignment.task_id != task.id:
-            raise serializers.ValidationError({"assignment": "Assignment does not belong to task."})
+            raise serializers.ValidationError(
+                {"assignment": "Assignment does not belong to task."}
+            )
         return attrs
 
 
@@ -84,10 +120,19 @@ class AssignmentSerializer(serializers.ModelSerializer):
             "ingested_at",
         ]
 
+
 class FrontendPluginSerializer(serializers.ModelSerializer):
     class Meta:
         model = FrontendPlugin
-        fields = ["id", "task_type", "name", "version", "manifest", "is_active", "created_at"]
+        fields = [
+            "id",
+            "task_type",
+            "name",
+            "version",
+            "manifest",
+            "is_active",
+            "created_at",
+        ]
 
     def validate(self, attrs):
         manifest = attrs.get("manifest") or {}
@@ -100,6 +145,8 @@ class FrontendPluginSerializer(serializers.ModelSerializer):
         manifest_task_type = manifest.get("task_type")
         if task_type and manifest_task_type and manifest_task_type != task_type.slug:
             raise serializers.ValidationError(
-                {"manifest": f"Manifest task_type ({manifest_task_type}) does not match plugin task_type ({task_type.slug})."}
+                {
+                    "manifest": f"Manifest task_type ({manifest_task_type}) does not match plugin task_type ({task_type.slug})."
+                }
             )
         return attrs

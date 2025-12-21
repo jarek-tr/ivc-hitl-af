@@ -33,17 +33,23 @@ def validate_plugin_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
 
     missing = REQUIRED_KEYS - manifest.keys()
     if missing:
-        raise ValidationError(f"Manifest missing required fields: {', '.join(sorted(missing))}.")
+        raise ValidationError(
+            f"Manifest missing required fields: {', '.join(sorted(missing))}."
+        )
 
     root = manifest.get("root") or ""
     if not isinstance(root, str) or not root.strip():
         raise ValidationError("Manifest field 'root' is required.")
     if os.path.isabs(root) or ".." in Path(root).parts:
-        raise ValidationError("Manifest field 'root' must be a relative path within /frontends.")
+        raise ValidationError(
+            "Manifest field 'root' must be a relative path within /frontends."
+        )
 
     plugin_root = _safe_path(FRONTENDS_ROOT, root)
     if not plugin_root.exists():
-        raise ValidationError(f"Manifest root '{root}' does not exist in {FRONTENDS_ROOT}.")
+        raise ValidationError(
+            f"Manifest root '{root}' does not exist in {FRONTENDS_ROOT}."
+        )
 
     js_files = _require_list(manifest, "js")
     css_files = _require_list(manifest, "css")
@@ -53,11 +59,15 @@ def validate_plugin_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
             raise ValidationError("Manifest asset paths cannot be empty.")
         asset_path = _safe_path(plugin_root, rel_path)
         if not asset_path.exists():
-            raise ValidationError(f"Manifest asset '{rel_path}' not found under {plugin_root}.")
+            raise ValidationError(
+                f"Manifest asset '{rel_path}' not found under {plugin_root}."
+            )
 
     schema_version = manifest.get("result_schema_version")
     if not isinstance(schema_version, str) or not schema_version.strip():
-        raise ValidationError("Manifest field 'result_schema_version' must be a string.")
+        raise ValidationError(
+            "Manifest field 'result_schema_version' must be a string."
+        )
 
     # Return sanitized copy to avoid accidental mutation.
     sanitized: Dict[str, Any] = {

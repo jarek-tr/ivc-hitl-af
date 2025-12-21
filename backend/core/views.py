@@ -16,37 +16,56 @@ from .models import (
     Assignment,
 )
 from .serializers import (
-    ProjectSerializer, AssetSerializer, TaskTypeSerializer,
-    TaskDefinitionSerializer, TaskSerializer, AnnotationSerializer,
-    FrontendPluginSerializer, AssignmentSerializer
+    ProjectSerializer,
+    AssetSerializer,
+    TaskTypeSerializer,
+    TaskDefinitionSerializer,
+    TaskSerializer,
+    AnnotationSerializer,
+    FrontendPluginSerializer,
+    AssignmentSerializer,
 )
 from .permissions import HasWriteToken
 
+
 def log_event(event_type: str, actor: str = "", payload=None):
-    EventLog.objects.create(event_type=event_type, actor=actor or "", payload=payload or {})
+    EventLog.objects.create(
+        event_type=event_type, actor=actor or "", payload=payload or {}
+    )
+
 
 class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all().order_by("id")
     serializer_class = ProjectSerializer
     permission_classes = [HasWriteToken]
 
+
 class AssetViewSet(viewsets.ModelViewSet):
     queryset = Asset.objects.select_related("project").all().order_by("id")
     serializer_class = AssetSerializer
     permission_classes = [HasWriteToken]
+
 
 class TaskTypeViewSet(viewsets.ModelViewSet):
     queryset = TaskType.objects.all().order_by("id")
     serializer_class = TaskTypeSerializer
     permission_classes = [HasWriteToken]
 
+
 class TaskDefinitionViewSet(viewsets.ModelViewSet):
     queryset = TaskDefinition.objects.select_related("task_type").all().order_by("id")
     serializer_class = TaskDefinitionSerializer
     permission_classes = [HasWriteToken]
 
+
 class TaskViewSet(viewsets.ModelViewSet):
-    queryset = Task.objects.select_related("project", "asset", "task_definition", "task_definition__task_type").all().order_by("id")
+    queryset = (
+        Task.objects.select_related(
+            "project", "asset", "task_definition", "task_definition__task_type"
+        )
+        .all()
+        .order_by("id")
+    )
     serializer_class = TaskSerializer
     permission_classes = [HasWriteToken]
 
@@ -58,13 +77,16 @@ class TaskViewSet(viewsets.ModelViewSet):
         tt = td.task_type
         plugin = getattr(tt, "plugin", None)
         plugin_manifest = plugin.manifest if plugin and plugin.is_active else None
-        return Response({
-            "task": TaskSerializer(task).data,
-            "asset": AssetSerializer(task.asset).data,
-            "task_type": TaskTypeSerializer(tt).data,
-            "task_definition": TaskDefinitionSerializer(td).data,
-            "plugin": plugin_manifest,
-        })
+        return Response(
+            {
+                "task": TaskSerializer(task).data,
+                "asset": AssetSerializer(task.asset).data,
+                "task_type": TaskTypeSerializer(tt).data,
+                "task_definition": TaskDefinitionSerializer(td).data,
+                "plugin": plugin_manifest,
+            }
+        )
+
 
 class AnnotationViewSet(viewsets.ModelViewSet):
     queryset = Annotation.objects.select_related("task").all().order_by("id")
@@ -93,12 +115,16 @@ class AnnotationViewSet(viewsets.ModelViewSet):
         actor = data.get("actor", "")
 
         if not assignment and submission_id:
-            assignment = Assignment.objects.filter(backend="mturk", assignment_id=submission_id).first()
+            assignment = Assignment.objects.filter(
+                backend="mturk", assignment_id=submission_id
+            ).first()
             if assignment:
                 data["assignment"] = assignment
 
         if submission_id:
-            existing = Annotation.objects.filter(task=task, submission_id=submission_id).first()
+            existing = Annotation.objects.filter(
+                task=task, submission_id=submission_id
+            ).first()
             if existing:
                 self._duplicate_annotation = existing
                 return existing
@@ -134,10 +160,12 @@ class AnnotationViewSet(viewsets.ModelViewSet):
         )
         return obj
 
+
 class AssignmentViewSet(viewsets.ModelViewSet):
     queryset = Assignment.objects.select_related("task").all().order_by("id")
     serializer_class = AssignmentSerializer
     permission_classes = [HasWriteToken]
+
 
 class PluginViewSet(viewsets.ModelViewSet):
     queryset = FrontendPlugin.objects.select_related("task_type").all().order_by("id")

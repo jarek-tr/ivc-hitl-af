@@ -53,7 +53,9 @@ def _create_assignment_record(task: Task, hit_id: str, params: Dict) -> None:
     )
 
 
-def _create_hit(task: Task, reward: str, max_assignments: int, lifetime_seconds: int) -> str:
+def _create_hit(
+    task: Task, reward: str, max_assignments: int, lifetime_seconds: int
+) -> str:
     client = get_mturk_client()
     url = _public_mturk_url(task.id)
     question = external_question_xml(url=url, frame_height=950)
@@ -76,19 +78,48 @@ def _create_hit(task: Task, reward: str, max_assignments: int, lifetime_seconds:
     }
     with transaction.atomic():
         _create_assignment_record(task, hit_id, params)
-        _log_event("MTURK_HIT_CREATED", {"task_id": task.id, "hit_id": hit_id, **params})
+        _log_event(
+            "MTURK_HIT_CREATED", {"task_id": task.id, "hit_id": hit_id, **params}
+        )
     logger.info("MTurk HIT %s created for task %s", hit_id, task.id)
     return hit_id
 
 
-@shared_task(bind=True, name="core.mturk.create_hit_for_task", autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, retry_kwargs={"max_retries": 5})
-def create_hit_for_task(self, task_id: int, reward: str = "0.10", max_assignments: int = 1, lifetime_seconds: int = 86400):
+@shared_task(
+    bind=True,
+    name="core.mturk.create_hit_for_task",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    retry_kwargs={"max_retries": 5},
+)
+def create_hit_for_task(
+    self,
+    task_id: int,
+    reward: str = "0.10",
+    max_assignments: int = 1,
+    lifetime_seconds: int = 86400,
+):
     task = Task.objects.select_related("task_definition__task_type").get(pk=task_id)
     return {"hit_id": _create_hit(task, reward, max_assignments, lifetime_seconds)}
 
 
-@shared_task(bind=True, name="core.mturk.create_hits_for_tasks", autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, retry_kwargs={"max_retries": 5})
-def create_hits_for_tasks(self, task_ids: List[int], reward: str = "0.10", max_assignments: int = 1, lifetime_seconds: int = 86400, batch_size: int = 25):
+@shared_task(
+    bind=True,
+    name="core.mturk.create_hits_for_tasks",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    retry_kwargs={"max_retries": 5},
+)
+def create_hits_for_tasks(
+    self,
+    task_ids: List[int],
+    reward: str = "0.10",
+    max_assignments: int = 1,
+    lifetime_seconds: int = 86400,
+    batch_size: int = 25,
+):
     tasks = list(
         Task.objects.select_related("task_definition__task_type")
         .filter(pk__in=task_ids)
@@ -105,7 +136,10 @@ def create_hits_for_tasks(self, task_ids: List[int], reward: str = "0.10", max_a
             ).exists()
             if existing:
                 skipped.append(task.id)
-                logger.info("Skipping HIT creation for task %s (active assignment exists)", task.id)
+                logger.info(
+                    "Skipping HIT creation for task %s (active assignment exists)",
+                    task.id,
+                )
                 continue
             hit_id = _create_hit(task, reward, max_assignments, lifetime_seconds)
             created.append({"task_id": task.id, "hit_id": hit_id})
@@ -198,7 +232,9 @@ def _update_assignment_from_record(obj: Assignment, record: Dict) -> bool:
 
 
 def _sync_assignments(hit_id: str) -> Dict[str, int]:
-    base_assignment = Assignment.objects.filter(hit_id=hit_id).order_by("created_at").first()
+    base_assignment = (
+        Assignment.objects.filter(hit_id=hit_id).order_by("created_at").first()
+    )
     if not base_assignment:
         logger.warning("No assignment record found for HIT %s", hit_id)
         return {"seen": 0, "updated": 0}
@@ -231,12 +267,26 @@ def _sync_assignments(hit_id: str) -> Dict[str, int]:
     return {"seen": seen, "updated": updated}
 
 
-@shared_task(bind=True, name="core.mturk.sync_assignments_for_hit", autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, retry_kwargs={"max_retries": 5})
+@shared_task(
+    bind=True,
+    name="core.mturk.sync_assignments_for_hit",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    retry_kwargs={"max_retries": 5},
+)
 def sync_assignments_for_hit(self, hit_id: str):
     return _sync_assignments(hit_id)
 
 
-@shared_task(bind=True, name="core.mturk.sync_open_hits", autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, retry_kwargs={"max_retries": 5})
+@shared_task(
+    bind=True,
+    name="core.mturk.sync_open_hits",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    retry_kwargs={"max_retries": 5},
+)
 def sync_open_hits(self, limit: int = 25):
     hit_ids = (
         Assignment.objects.filter(
@@ -264,7 +314,9 @@ def _build_annotation_payload(assignment: Assignment) -> Optional[Dict]:
         return None
     payload = dict(annotation_json)
     payload["task"] = assignment.task_id
-    payload["submission_id"] = payload.get("submission_id") or assignment.assignment_id or uuid.uuid4().hex
+    payload["submission_id"] = (
+        payload.get("submission_id") or assignment.assignment_id or uuid.uuid4().hex
+    )
     payload["assignment"] = assignment.id
     raw = dict(assignment.payload or {})
     raw["ingested_via"] = "mturk"
@@ -272,11 +324,22 @@ def _build_annotation_payload(assignment: Assignment) -> Optional[Dict]:
     return payload
 
 
-@shared_task(bind=True, name="core.mturk.ingest_submitted_assignments", autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, retry_kwargs={"max_retries": 5})
+@shared_task(
+    bind=True,
+    name="core.mturk.ingest_submitted_assignments",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    retry_kwargs={"max_retries": 5},
+)
 def ingest_submitted_assignments(self, limit: int = 20):
     qs = (
         Assignment.objects.select_related("task")
-        .filter(backend="mturk", status__in=["submitted", "approved"], ingested_at__isnull=True)
+        .filter(
+            backend="mturk",
+            status__in=["submitted", "approved"],
+            ingested_at__isnull=True,
+        )
         .order_by("updated_at")[:limit]
     )
     ingested = 0
@@ -287,7 +350,12 @@ def ingest_submitted_assignments(self, limit: int = 20):
             skipped += 1
             continue
         submission_id = data.get("submission_id")
-        if submission_id and Annotation.objects.filter(task=assignment.task, submission_id=submission_id).exists():
+        if (
+            submission_id
+            and Annotation.objects.filter(
+                task=assignment.task, submission_id=submission_id
+            ).exists()
+        ):
             assignment.ingested_at = timezone.now()
             assignment.updated_at = assignment.ingested_at
             assignment.save(update_fields=["ingested_at", "updated_at"])
@@ -298,7 +366,11 @@ def ingest_submitted_assignments(self, limit: int = 20):
             serializer.is_valid(raise_exception=True)
             annotation = serializer.save()
         except serializers.ValidationError as exc:
-            logger.warning("Failed to ingest assignment %s: %s", assignment.assignment_id, exc.detail)
+            logger.warning(
+                "Failed to ingest assignment %s: %s",
+                assignment.assignment_id,
+                exc.detail,
+            )
             continue
         assignment.ingested_at = annotation.created_at
         assignment.updated_at = timezone.now()

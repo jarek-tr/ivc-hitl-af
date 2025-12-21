@@ -20,10 +20,16 @@ class Asset(models.Model):
         ("image", "image"),
         ("video_frame", "video_frame"),
     ]
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="assets")
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="assets"
+    )
     media_type = models.CharField(max_length=20, choices=MEDIA_CHOICES, default="image")
-    s3_key = models.CharField(max_length=512, help_text="S3 object key (not a presigned URL).")
-    sha256 = models.CharField(max_length=64, blank=True, help_text="Optional content hash.")
+    s3_key = models.CharField(
+        max_length=512, help_text="S3 object key (not a presigned URL)."
+    )
+    sha256 = models.CharField(
+        max_length=64, blank=True, help_text="Optional content hash."
+    )
     width = models.IntegerField(null=True, blank=True)
     height = models.IntegerField(null=True, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
@@ -47,7 +53,9 @@ class TaskType(models.Model):
 class TaskDefinition(models.Model):
     """Versioned definition for a task type (label schema, UI config, validation)."""
 
-    task_type = models.ForeignKey(TaskType, on_delete=models.CASCADE, related_name="definitions")
+    task_type = models.ForeignKey(
+        TaskType, on_delete=models.CASCADE, related_name="definitions"
+    )
     version = models.CharField(max_length=32, validators=[MinLengthValidator(1)])
     definition = models.JSONField(default=dict)
     created_at = models.DateTimeField(default=timezone.now)
@@ -68,10 +76,14 @@ class Task(models.Model):
     ]
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="tasks")
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name="tasks")
-    task_definition = models.ForeignKey(TaskDefinition, on_delete=models.PROTECT, related_name="tasks")
+    task_definition = models.ForeignKey(
+        TaskDefinition, on_delete=models.PROTECT, related_name="tasks"
+    )
     status = models.CharField(max_length=20, choices=STATUS, default="pending")
     priority = models.IntegerField(default=0)
-    payload = models.JSONField(default=dict, blank=True, help_text="Per-task extra config.")
+    payload = models.JSONField(
+        default=dict, blank=True, help_text="Per-task extra config."
+    )
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -100,7 +112,9 @@ class Assignment(models.Model):
     sandbox = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
-    payload = models.JSONField(default=dict, blank=True, help_text="Raw MTurk payload snapshots.")
+    payload = models.JSONField(
+        default=dict, blank=True, help_text="Raw MTurk payload snapshots."
+    )
     last_polled_at = models.DateTimeField(null=True, blank=True)
     ingested_at = models.DateTimeField(null=True, blank=True)
 
@@ -109,7 +123,9 @@ class Assignment(models.Model):
             models.Index(fields=["backend", "hit_id"], name="asgn_backend_hit_idx"),
             models.Index(fields=["assignment_id"], name="asgn_assignment_idx"),
             models.Index(fields=["task", "status"], name="asgn_task_status_idx"),
-            models.Index(fields=["status", "updated_at"], name="asgn_status_updated_idx"),
+            models.Index(
+                fields=["status", "updated_at"], name="asgn_status_updated_idx"
+            ),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -130,7 +146,9 @@ class Annotation(models.Model):
     schema_version = models.CharField(max_length=32)
     tool_version = models.CharField(max_length=32, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
-    actor = models.CharField(max_length=128, blank=True, help_text="Optional session/worker identifier.")
+    actor = models.CharField(
+        max_length=128, blank=True, help_text="Optional session/worker identifier."
+    )
     submission_id = models.CharField(
         max_length=128,
         blank=True,
@@ -144,7 +162,9 @@ class Annotation(models.Model):
         related_name="annotations",
         help_text="Source assignment if known.",
     )
-    raw_payload = models.JSONField(default=dict, blank=True, help_text="Raw submission payload for audit.")
+    raw_payload = models.JSONField(
+        default=dict, blank=True, help_text="Raw submission payload for audit."
+    )
 
     class Meta:
         indexes = [
@@ -163,7 +183,9 @@ class Annotation(models.Model):
 class FrontendPlugin(models.Model):
     """Maps a TaskType to a frontend bundle served by this backend."""
 
-    task_type = models.OneToOneField(TaskType, on_delete=models.CASCADE, related_name="plugin")
+    task_type = models.OneToOneField(
+        TaskType, on_delete=models.CASCADE, related_name="plugin"
+    )
     name = models.CharField(max_length=200)
     version = models.CharField(max_length=32)
     manifest = models.JSONField(default=dict)

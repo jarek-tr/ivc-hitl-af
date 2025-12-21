@@ -1,4 +1,5 @@
 """Unit tests for core module functions and serializers."""
+
 import os
 import json
 from unittest import mock
@@ -6,7 +7,6 @@ from pathlib import Path
 
 from django.test import TestCase, override_settings
 from django.core.exceptions import ValidationError as DjangoValidationError
-from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from .adapters.mturk.client import get_mturk_client
 from .adapters.mturk.templates import external_question_xml
@@ -24,11 +24,11 @@ class GetMturkClientTestCase(TestCase):
     def test_sandbox_environment(self, mock_boto_client):
         """Test client is configured for sandbox environment."""
         get_mturk_client()
-        
+
         mock_boto_client.assert_called_once_with(
             "mturk",
             region_name="us-west-2",
-            endpoint_url="https://mturk-requester-sandbox.us-east-1.amazonaws.com"
+            endpoint_url="https://mturk-requester-sandbox.us-east-1.amazonaws.com",
         )
 
     @override_settings(MTURK_SANDBOX=False, AWS_REGION="us-east-1")
@@ -36,11 +36,11 @@ class GetMturkClientTestCase(TestCase):
     def test_production_environment(self, mock_boto_client):
         """Test client is configured for production environment."""
         get_mturk_client()
-        
+
         mock_boto_client.assert_called_once_with(
             "mturk",
             region_name="us-east-1",
-            endpoint_url="https://mturk-requester.us-east-1.amazonaws.com"
+            endpoint_url="https://mturk-requester.us-east-1.amazonaws.com",
         )
 
     @override_settings(MTURK_SANDBOX=True)
@@ -49,22 +49,26 @@ class GetMturkClientTestCase(TestCase):
     def test_region_from_environment_variable(self, mock_boto_client):
         """Test AWS_REGION can be overridden by environment variable."""
         get_mturk_client()
-        
+
         mock_boto_client.assert_called_once_with(
             "mturk",
             region_name="eu-west-1",
-            endpoint_url="https://mturk-requester-sandbox.us-east-1.amazonaws.com"
+            endpoint_url="https://mturk-requester-sandbox.us-east-1.amazonaws.com",
         )
 
     @override_settings(MTURK_SANDBOX=False)
-    @mock.patch.dict(os.environ, {"MTURK_ENDPOINT": "https://custom-endpoint.example.com"})
+    @mock.patch.dict(
+        os.environ, {"MTURK_ENDPOINT": "https://custom-endpoint.example.com"}
+    )
     @mock.patch("core.adapters.mturk.client.boto3.client")
     def test_endpoint_from_environment_variable(self, mock_boto_client):
         """Test MTURK_ENDPOINT can be overridden by environment variable."""
         get_mturk_client()
-        
+
         call_kwargs = mock_boto_client.call_args[1]
-        self.assertEqual(call_kwargs["endpoint_url"], "https://custom-endpoint.example.com")
+        self.assertEqual(
+            call_kwargs["endpoint_url"], "https://custom-endpoint.example.com"
+        )
 
 
 class ExternalQuestionXmlTestCase(TestCase):
@@ -74,47 +78,49 @@ class ExternalQuestionXmlTestCase(TestCase):
         """Test XML generation with a simple URL."""
         url = "https://example.com/task"
         result = external_question_xml(url)
-        
+
         self.assertIn('<?xml version="1.0" encoding="UTF-8"?>', result)
-        self.assertIn('<ExternalQuestion xmlns="http://mechanicalturk.amazonaws.com', result)
-        self.assertIn('<ExternalURL>https://example.com/task</ExternalURL>', result)
-        self.assertIn('<FrameHeight>900</FrameHeight>', result)
+        self.assertIn(
+            '<ExternalQuestion xmlns="http://mechanicalturk.amazonaws.com', result
+        )
+        self.assertIn("<ExternalURL>https://example.com/task</ExternalURL>", result)
+        self.assertIn("<FrameHeight>900</FrameHeight>", result)
 
     def test_url_with_query_parameters(self):
         """Test XML generation properly escapes URL with query parameters."""
         url = "https://example.com/task?id=123&type=annotation"
         result = external_question_xml(url)
-        
+
         # Ampersands should be escaped
-        self.assertIn('id=123&amp;type=annotation', result)
-        self.assertNotIn('id=123&type=annotation', result)
+        self.assertIn("id=123&amp;type=annotation", result)
+        self.assertNotIn("id=123&type=annotation", result)
 
     def test_url_with_special_characters(self):
         """Test XML generation escapes special characters properly."""
         url = 'https://example.com/task?data=<value>&flag="true"'
         result = external_question_xml(url)
-        
+
         # Check for proper escaping
-        self.assertIn('&lt;', result)  # < should be escaped
-        self.assertIn('&quot;', result)  # " should be escaped
-        self.assertIn('&amp;', result)  # & should be escaped
+        self.assertIn("&lt;", result)  # < should be escaped
+        self.assertIn("&quot;", result)  # " should be escaped
+        self.assertIn("&amp;", result)  # & should be escaped
         # Original characters should not be present unescaped in the URL
-        self.assertNotIn('<value>', result)
+        self.assertNotIn("<value>", result)
 
     def test_custom_frame_height(self):
         """Test XML generation with custom frame height."""
         url = "https://example.com/task"
         result = external_question_xml(url, frame_height=1200)
-        
-        self.assertIn('<FrameHeight>1200</FrameHeight>', result)
+
+        self.assertIn("<FrameHeight>1200</FrameHeight>", result)
 
     def test_generated_xml_is_well_formed(self):
         """Test that generated XML can be parsed (is well-formed)."""
         import xml.etree.ElementTree as ET
-        
+
         url = "https://example.com/task?param=value&other=test"
         result = external_question_xml(url)
-        
+
         # Should not raise an exception
         tree = ET.fromstring(result)
         self.assertIsNotNone(tree)
@@ -133,9 +139,9 @@ class ParseMturkAnswersTestCase(TestCase):
             <FreeText>{json.dumps(annotation_data)}</FreeText>
           </Answer>
         </QuestionFormAnswers>"""
-        
+
         result = _parse_mturk_answers(xml)
-        
+
         self.assertIn("fields", result)
         self.assertIn("annotation", result["fields"])
         self.assertEqual(result["fields"]["annotation"], json.dumps(annotation_data))
@@ -156,18 +162,18 @@ class ParseMturkAnswersTestCase(TestCase):
             <FreeText>value2</FreeText>
           </Answer>
         </QuestionFormAnswers>"""
-        
+
         result = _parse_mturk_answers(xml)
-        
+
         self.assertEqual(result["fields"]["field1"], "value1")
         self.assertEqual(result["fields"]["field2"], "value2")
 
     def test_malformed_xml(self):
         """Test handling of malformed XML."""
         malformed_xml = "<QuestionFormAnswers><Answer><Unclosed>"
-        
+
         result = _parse_mturk_answers(malformed_xml)
-        
+
         self.assertIn("fields", result)
         self.assertEqual(result["fields"], {})
         self.assertIn("raw", result)
@@ -176,13 +182,13 @@ class ParseMturkAnswersTestCase(TestCase):
     def test_empty_xml(self):
         """Test handling of empty XML string."""
         result = _parse_mturk_answers("")
-        
+
         self.assertEqual(result, {"fields": {}})
 
     def test_none_xml(self):
         """Test handling of None input."""
         result = _parse_mturk_answers(None)
-        
+
         self.assertEqual(result, {"fields": {}})
 
     def test_xml_with_invalid_json_annotation(self):
@@ -194,9 +200,9 @@ class ParseMturkAnswersTestCase(TestCase):
             <FreeText>not valid json{</FreeText>
           </Answer>
         </QuestionFormAnswers>"""
-        
+
         result = _parse_mturk_answers(xml)
-        
+
         self.assertIn("fields", result)
         self.assertEqual(result["fields"]["annotation"], "not valid json{")
         # annotation_json should not be present when JSON parsing fails
@@ -211,9 +217,9 @@ class ParseMturkAnswersTestCase(TestCase):
             <FreeText>testvalue</FreeText>
           </Answer>
         </QuestionFormAnswers>"""
-        
+
         result = _parse_mturk_answers(xml)
-        
+
         self.assertEqual(result["fields"]["test"], "testvalue")
 
     def test_xml_with_empty_fields(self):
@@ -229,9 +235,9 @@ class ParseMturkAnswersTestCase(TestCase):
             <FreeText></FreeText>
           </Answer>
         </QuestionFormAnswers>"""
-        
+
         result = _parse_mturk_answers(xml)
-        
+
         # Empty key should not be added
         self.assertNotIn("", result["fields"])
         # Key with empty value should be added
@@ -246,42 +252,30 @@ class AnnotationSerializerTestCase(TestCase):
         """Set up test data."""
         self.project = Project.objects.create(slug="test-project", name="Test Project")
         self.asset = Asset.objects.create(
-            project=self.project,
-            media_type="image",
-            s3_key="test/image.jpg"
+            project=self.project, media_type="image", s3_key="test/image.jpg"
         )
         self.task_type = TaskType.objects.create(slug="bbox", name="Bounding Box")
         self.task_definition = TaskDefinition.objects.create(
-            task_type=self.task_type,
-            version="1.0",
-            definition={}
+            task_type=self.task_type, version="1.0", definition={}
         )
         self.task = Task.objects.create(
-            project=self.project,
-            asset=self.asset,
-            task_definition=self.task_definition
+            project=self.project, asset=self.asset, task_definition=self.task_definition
         )
         self.other_task = Task.objects.create(
-            project=self.project,
-            asset=self.asset,
-            task_definition=self.task_definition
+            project=self.project, asset=self.asset, task_definition=self.task_definition
         )
         self.assignment = Assignment.objects.create(
             task=self.task,
             backend="mturk",
             hit_id="TEST_HIT_123",
-            assignment_id="TEST_ASSIGNMENT_123"
+            assignment_id="TEST_ASSIGNMENT_123",
         )
 
     def test_submission_id_auto_generated_if_missing(self):
         """Test submission_id is automatically generated if not provided."""
-        data = {
-            "task": self.task.id,
-            "result": {"boxes": []},
-            "schema_version": "1.0"
-        }
+        data = {"task": self.task.id, "result": {"boxes": []}, "schema_version": "1.0"}
         serializer = AnnotationSerializer(data=data)
-        
+
         self.assertTrue(serializer.is_valid())
         self.assertIsNotNone(serializer.validated_data["submission_id"])
         self.assertNotEqual(serializer.validated_data["submission_id"], "")
@@ -293,22 +287,18 @@ class AnnotationSerializerTestCase(TestCase):
             "task": self.task.id,
             "result": {"boxes": []},
             "schema_version": "1.0",
-            "submission_id": submission_id
+            "submission_id": submission_id,
         }
         serializer = AnnotationSerializer(data=data)
-        
+
         self.assertTrue(serializer.is_valid())
         self.assertEqual(serializer.validated_data["submission_id"], submission_id)
 
     def test_raw_payload_defaults_to_empty_dict(self):
         """Test raw_payload defaults to empty dict if not provided."""
-        data = {
-            "task": self.task.id,
-            "result": {"boxes": []},
-            "schema_version": "1.0"
-        }
+        data = {"task": self.task.id, "result": {"boxes": []}, "schema_version": "1.0"}
         serializer = AnnotationSerializer(data=data)
-        
+
         self.assertTrue(serializer.is_valid())
         self.assertEqual(serializer.validated_data["raw_payload"], {})
 
@@ -318,10 +308,10 @@ class AnnotationSerializerTestCase(TestCase):
             "task": self.task.id,
             "result": {"boxes": []},
             "schema_version": "1.0",
-            "assignment": self.assignment.id
+            "assignment": self.assignment.id,
         }
         serializer = AnnotationSerializer(data=data)
-        
+
         self.assertTrue(serializer.is_valid())
 
     def test_assignment_task_relationship_invalid(self):
@@ -330,10 +320,10 @@ class AnnotationSerializerTestCase(TestCase):
             "task": self.other_task.id,  # Different task
             "result": {"boxes": []},
             "schema_version": "1.0",
-            "assignment": self.assignment.id  # Assignment belongs to self.task
+            "assignment": self.assignment.id,  # Assignment belongs to self.task
         }
         serializer = AnnotationSerializer(data=data)
-        
+
         self.assertFalse(serializer.is_valid())
         self.assertIn("assignment", serializer.errors)
         self.assertIn("does not belong to task", str(serializer.errors["assignment"]))
@@ -344,21 +334,17 @@ class AnnotationSerializerTestCase(TestCase):
             "task": self.task.id,
             "result": {"boxes": []},
             "schema_version": "1.0",
-            "assignment": None
+            "assignment": None,
         }
         serializer = AnnotationSerializer(data=data)
-        
+
         self.assertTrue(serializer.is_valid())
 
     def test_assignment_not_provided(self):
         """Test validation passes when assignment is not provided."""
-        data = {
-            "task": self.task.id,
-            "result": {"boxes": []},
-            "schema_version": "1.0"
-        }
+        data = {"task": self.task.id, "result": {"boxes": []}, "schema_version": "1.0"}
         serializer = AnnotationSerializer(data=data)
-        
+
         self.assertTrue(serializer.is_valid())
 
     def test_create_annotation_with_all_fields(self):
@@ -371,13 +357,13 @@ class AnnotationSerializerTestCase(TestCase):
             "actor": "worker123",
             "submission_id": "sub-123",
             "assignment": self.assignment.id,
-            "raw_payload": {"source": "mturk"}
+            "raw_payload": {"source": "mturk"},
         }
         serializer = AnnotationSerializer(data=data)
-        
+
         self.assertTrue(serializer.is_valid())
         annotation = serializer.save()
-        
+
         self.assertEqual(annotation.task.id, self.task.id)
         self.assertEqual(annotation.assignment.id, self.assignment.id)
         self.assertEqual(annotation.submission_id, "sub-123")
@@ -391,23 +377,25 @@ class ValidatePluginManifestTestCase(TestCase):
         """Set up test environment with temporary directories."""
         # Create a temporary directory structure for testing
         from django.conf import settings
+
         self.test_frontends_root = Path(settings.BASE_DIR.parent) / "frontends"
         self.test_plugin_root = self.test_frontends_root / "test-plugin"
-        
+
         # Create directories
         self.test_frontends_root.mkdir(exist_ok=True)
         self.test_plugin_root.mkdir(exist_ok=True)
-        
+
         # Create test files
         self.test_js_file = self.test_plugin_root / "main.js"
         self.test_js_file.write_text("// test js")
-        
+
         self.test_css_file = self.test_plugin_root / "styles.css"
         self.test_css_file.write_text("/* test css */")
 
     def tearDown(self):
         """Clean up test files."""
         import shutil
+
         if self.test_frontends_root.exists():
             shutil.rmtree(self.test_frontends_root)
 
@@ -420,11 +408,11 @@ class ValidatePluginManifestTestCase(TestCase):
             "root": "test-plugin",
             "js": ["main.js"],
             "css": ["styles.css"],
-            "result_schema_version": "1.0"
+            "result_schema_version": "1.0",
         }
-        
+
         result = validate_plugin_manifest(manifest)
-        
+
         self.assertEqual(result["name"], "Test Plugin")
         self.assertEqual(result["task_type"], "bbox")
         self.assertEqual(result["version"], "1.0.0")
@@ -436,23 +424,23 @@ class ValidatePluginManifestTestCase(TestCase):
         """Test validation fails when required fields are missing."""
         manifest = {
             "name": "Test Plugin",
-            "task_type": "bbox"
+            "task_type": "bbox",
             # Missing: version, root, js, result_schema_version
         }
-        
+
         with self.assertRaises(DjangoValidationError) as context:
             validate_plugin_manifest(manifest)
-        
+
         error_message = str(context.exception)
         self.assertIn("missing required fields", error_message.lower())
 
     def test_not_a_dict(self):
         """Test validation fails when manifest is not a dict."""
         manifest = ["not", "a", "dict"]
-        
+
         with self.assertRaises(DjangoValidationError) as context:
             validate_plugin_manifest(manifest)
-        
+
         self.assertIn("must be a JSON object", str(context.exception))
 
     def test_root_is_absolute_path(self):
@@ -464,12 +452,12 @@ class ValidatePluginManifestTestCase(TestCase):
             "root": "/absolute/path",
             "js": ["main.js"],
             "css": [],
-            "result_schema_version": "1.0"
+            "result_schema_version": "1.0",
         }
-        
+
         with self.assertRaises(DjangoValidationError) as context:
             validate_plugin_manifest(manifest)
-        
+
         self.assertIn("must be a relative path", str(context.exception))
 
     def test_root_contains_parent_directory_traversal(self):
@@ -481,12 +469,12 @@ class ValidatePluginManifestTestCase(TestCase):
             "root": "../escape",
             "js": ["main.js"],
             "css": [],
-            "result_schema_version": "1.0"
+            "result_schema_version": "1.0",
         }
-        
+
         with self.assertRaises(DjangoValidationError) as context:
             validate_plugin_manifest(manifest)
-        
+
         self.assertIn("must be a relative path", str(context.exception))
 
     def test_root_does_not_exist(self):
@@ -498,12 +486,12 @@ class ValidatePluginManifestTestCase(TestCase):
             "root": "nonexistent-plugin",
             "js": ["main.js"],
             "css": [],
-            "result_schema_version": "1.0"
+            "result_schema_version": "1.0",
         }
-        
+
         with self.assertRaises(DjangoValidationError) as context:
             validate_plugin_manifest(manifest)
-        
+
         self.assertIn("does not exist", str(context.exception))
 
     def test_js_file_does_not_exist(self):
@@ -515,12 +503,12 @@ class ValidatePluginManifestTestCase(TestCase):
             "root": "test-plugin",
             "js": ["nonexistent.js"],
             "css": [],
-            "result_schema_version": "1.0"
+            "result_schema_version": "1.0",
         }
-        
+
         with self.assertRaises(DjangoValidationError) as context:
             validate_plugin_manifest(manifest)
-        
+
         self.assertIn("not found", str(context.exception))
 
     def test_css_file_does_not_exist(self):
@@ -532,12 +520,12 @@ class ValidatePluginManifestTestCase(TestCase):
             "root": "test-plugin",
             "js": ["main.js"],
             "css": ["nonexistent.css"],
-            "result_schema_version": "1.0"
+            "result_schema_version": "1.0",
         }
-        
+
         with self.assertRaises(DjangoValidationError) as context:
             validate_plugin_manifest(manifest)
-        
+
         self.assertIn("not found", str(context.exception))
 
     def test_path_traversal_in_js_file(self):
@@ -545,7 +533,7 @@ class ValidatePluginManifestTestCase(TestCase):
         # Create a file outside the plugin root
         outside_file = self.test_frontends_root / "outside.js"
         outside_file.write_text("// outside")
-        
+
         manifest = {
             "name": "Test Plugin",
             "task_type": "bbox",
@@ -553,12 +541,12 @@ class ValidatePluginManifestTestCase(TestCase):
             "root": "test-plugin",
             "js": ["../outside.js"],  # Tries to escape plugin root
             "css": [],
-            "result_schema_version": "1.0"
+            "result_schema_version": "1.0",
         }
-        
+
         with self.assertRaises(DjangoValidationError) as context:
             validate_plugin_manifest(manifest)
-        
+
         self.assertIn("escapes plugin root", str(context.exception))
 
     def test_js_not_a_list(self):
@@ -570,12 +558,12 @@ class ValidatePluginManifestTestCase(TestCase):
             "root": "test-plugin",
             "js": "main.js",  # Should be a list
             "css": [],
-            "result_schema_version": "1.0"
+            "result_schema_version": "1.0",
         }
-        
+
         with self.assertRaises(DjangoValidationError) as context:
             validate_plugin_manifest(manifest)
-        
+
         self.assertIn("must be a list", str(context.exception))
 
     def test_css_not_a_list(self):
@@ -587,12 +575,12 @@ class ValidatePluginManifestTestCase(TestCase):
             "root": "test-plugin",
             "js": ["main.js"],
             "css": "styles.css",  # Should be a list
-            "result_schema_version": "1.0"
+            "result_schema_version": "1.0",
         }
-        
+
         with self.assertRaises(DjangoValidationError) as context:
             validate_plugin_manifest(manifest)
-        
+
         self.assertIn("must be a list", str(context.exception))
 
     def test_result_schema_version_invalid(self):
@@ -604,12 +592,12 @@ class ValidatePluginManifestTestCase(TestCase):
             "root": "test-plugin",
             "js": ["main.js"],
             "css": [],
-            "result_schema_version": 1.0  # Should be a string
+            "result_schema_version": 1.0,  # Should be a string
         }
-        
+
         with self.assertRaises(DjangoValidationError) as context:
             validate_plugin_manifest(manifest)
-        
+
         self.assertIn("result_schema_version", str(context.exception))
         self.assertIn("must be a string", str(context.exception))
 
@@ -622,12 +610,12 @@ class ValidatePluginManifestTestCase(TestCase):
             "root": "test-plugin",
             "js": [""],  # Empty path
             "css": [],
-            "result_schema_version": "1.0"
+            "result_schema_version": "1.0",
         }
-        
+
         with self.assertRaises(DjangoValidationError) as context:
             validate_plugin_manifest(manifest)
-        
+
         self.assertIn("cannot be empty", str(context.exception))
 
     def test_manifest_with_extra_fields(self):
@@ -641,11 +629,11 @@ class ValidatePluginManifestTestCase(TestCase):
             "css": [],
             "result_schema_version": "1.0",
             "extra_field": "extra_value",
-            "another_field": 123
+            "another_field": 123,
         }
-        
+
         result = validate_plugin_manifest(manifest)
-        
+
         self.assertEqual(result["extra_field"], "extra_value")
         self.assertEqual(result["another_field"], 123)
 
@@ -658,10 +646,10 @@ class ValidatePluginManifestTestCase(TestCase):
             "root": "test-plugin",
             "js": [],
             "css": [],
-            "result_schema_version": "1.0"
+            "result_schema_version": "1.0",
         }
-        
+
         result = validate_plugin_manifest(manifest)
-        
+
         self.assertEqual(result["js"], [])
         self.assertEqual(result["css"], [])
