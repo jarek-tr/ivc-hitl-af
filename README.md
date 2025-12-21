@@ -7,19 +7,40 @@ A durable, API-first backend with **hot-swappable annotation frontends**, design
 
 ---
 
+## Design Intent (Read This First)
+
+This framework is designed as a **research instrument**, not a one-off data collection tool.
+
+Many annotation systems optimize for speed or simplicity.  
+This system optimizes for **longevity, interpretability, and auditability** in research contexts where:
+
+- Label definitions evolve over time  
+- Annotation UIs influence outcomes  
+- Annotator populations are heterogeneous  
+- Old annotations must remain meaningful years later  
+
+**Key principle:**  
+New task types, schemas, and frontends should be added **without modifying or invalidating prior annotations**.
+
+If you feel tempted to “simplify” the system, first ask whether that simplification would erase important provenance.
+
+---
+
 ## Goals
-- Long-lived research infrastructure for image/video annotation
-- Versioned task definitions so annotations remain interpretable years later
-- Pluggable frontends per task type (compiled React bundles registered by manifest)
-- Auditable, idempotent ingestion for crowdsourced annotations
+
+- Long-lived research infrastructure for image/video annotation  
+- Versioned task definitions so annotations remain interpretable years later  
+- Pluggable frontends per task type (compiled React bundles registered by manifest)  
+- Auditable, idempotent ingestion for crowdsourced annotations  
 
 ---
 
 ## Tech Stack
-- **Backend:** Django + DRF + Postgres
-- **Async jobs:** Celery + Redis (MTurk HIT creation, polling, ingestion)
-- **Assets:** S3-compatible storage (recommended via presigned URLs)
-- **Frontends:** Framework-agnostic static bundles (React recommended)
+
+- **Backend:** Django + DRF + Postgres  
+- **Async jobs:** Celery + Redis (MTurk HIT creation, polling, ingestion)  
+- **Assets:** S3-compatible storage (recommended via presigned URLs)  
+- **Frontends:** Framework-agnostic static bundles (React recommended)  
 
 ---
 
@@ -39,6 +60,9 @@ The backend injects that bundle into a minimal HTML shell at:
 ```
 
 No frontend code is baked into Django.
+
+This separation is intentional:  
+**annotation logic lives in frontends; provenance and orchestration live in the backend.**
 
 ---
 
@@ -66,172 +90,30 @@ No frontend code is baked into Django.
    ```
 
 5. Visit API:
-   - API root: http://localhost:8000/api/
-   - OpenAPI schema: http://localhost:8000/api/schema/
-   - Swagger UI: http://localhost:8000/api/docs/
-   - Example project stats: http://localhost:8000/api/projects/1/stats/
+   - API root: http://localhost:8000/api/  
+   - OpenAPI schema: http://localhost:8000/api/schema/  
+   - Swagger UI: http://localhost:8000/api/docs/  
 
 ---
 
 ## Core Concepts
 
-- **TaskType**  
-  Logical annotation task (e.g., `bbox`, `salient_poly`, `qa`)
-
-- **TaskDefinition (versioned)**  
-  JSON schema defining labeling rules and UI expectations
-
-- **Task**  
-  A unit of work tied to an Asset + TaskDefinition
-
-- **Annotation**  
-  Versioned result JSON submitted by a frontend
-
-- **FrontendPlugin**  
-  A compiled UI bundle registered for a TaskType via manifest
-
----
-
-## MTurk & Ingestion Notes
-
-- MTurk operations live in `core.mturk`:
-  - `create_hits_for_tasks`
-  - `sync_open_hits`
-  - `ingest_submitted_assignments`
-- Annotations are **idempotent** via `submission_id`
-  - Duplicate submissions return HTTP 200 with the original payload
-- Assignment rows persist raw MTurk payloads and timestamps for auditability
-- Plugin manifests are validated against the `frontends/` directory before activation
-
----
-
-## Salient Polygon Plugin (`frontends/salient-poly`)
-
-A polished React UI for single-object salient segmentation using polygons.
-
-### Build the plugin
-```bash
-cd frontends/salient-poly
-npm install
-npm run build
-```
-
-Vite emits:
-```
-dist/assets/index.js
-dist/assets/index.css
-```
-
-These paths must match the plugin manifest.
-
----
-
-### Register the plugin
-```bash
-python manage.py shell <<'PY'
-import json
-from core.models import TaskType, FrontendPlugin
-
-task_type, _ = TaskType.objects.get_or_create(
-    slug="salient_poly",
-    defaults={"name": "Salient Object Segmentation"},
-)
-
-with open("frontends/salient-poly/manifest.json") as fh:
-    manifest = json.load(fh)
-
-FrontendPlugin.objects.update_or_create(
-    task_type=task_type,
-    defaults={
-        "name": manifest["name"],
-        "version": manifest["version"],
-        "manifest": manifest,
-        "is_active": True,
-    },
-)
-PY
-```
-
----
-
-### Patch an Asset with a test image
-```bash
-curl -X PATCH http://localhost:8000/api/assets/<asset_id>/ \
-  -H "Content-Type: application/json" \
-  -H "X-IVC-Write-Token: <your_write_token>" \
-  -d '{"metadata":{"image_url":"https://picsum.photos/1200/800.jpg"}}'
-```
-
-Create a `Task` that uses the `salient_poly` TaskDefinition, then open:
-
-```
-http://localhost:8000/api/tasks/<task_id>/annotate/
-```
-
----
-
-## Example Datasets
-
-The system includes example datasets to help you get started:
-
-```bash
-# Load example projects with sample annotations
-python manage.py load_examples
-
-# Or use the CLI tool
-ivc-hitl-af load-examples
-
-# View loaded data
-curl http://localhost:8000/api/projects/1/stats/
-curl http://localhost:8000/api/projects/1/export/
-```
-
-The example dataset includes:
-- 3 projects (classification, bounding box, polygon annotation)
-- 6 assets with placeholder S3 keys
-- 6 tasks (2 per project)
-- 3 sample annotations demonstrating different result formats
-
-See [`backend/core/fixtures/README.md`](backend/core/fixtures/README.md) for complete documentation.
-
----
-
-## CLI Tool
-
-The `ivc-hitl-af` CLI provides convenient commands for common operations:
-
-```bash
-# Initialize a new project
-ivc-hitl-af init-project --name "My Project" --slug "my-project"
-
-# Load example datasets
-ivc-hitl-af load-examples
-
-# Validate registered plugins
-ivc-hitl-af validate-plugins --strict
-
-# Register a new plugin
-ivc-hitl-af register-plugin frontends/my-plugin --task-type my-task
-
-# Export project annotations
-ivc-hitl-af export-annotations my-project --format json --output annotations.json
-
-# Sync MTurk HITs and assignments
-ivc-hitl-af sync-mturk --limit 50
-```
-
----
-
-## Documentation
-
-- **[Architecture Guide](docs/architecture.md)** - Complete system documentation (1,179 lines)
-- **[Deployment Guide](docs/deployment.md)** - Production deployment for 6+ platforms
-- **[Plugin Development Guide](docs/plugin-guide.md)** - Build custom annotation UIs (802 lines)
-- **[Example Dataset Guide](backend/core/fixtures/README.md)** - Sample data and usage
+- **TaskType** — logical annotation task (e.g., `bbox`, `polygon`, `qa`)  
+- **TaskDefinition (versioned)** — JSON schema defining labeling rules and semantics  
+- **Task** — unit of work tied to an Asset + TaskDefinition  
+- **Annotation** — versioned result JSON submitted by a frontend  
+- **FrontendPlugin** — compiled UI bundle registered via manifest  
 
 ---
 
 ## Status
 
-This repository is intended as **shared lab infrastructure**, not a one-off project.
-Design favors clarity, explicitness, and auditability over clever abstractions.
+This repository is intended as **shared lab infrastructure**, not a single-project artifact.
+
+Design favors:
+- explicitness over cleverness  
+- versioning over mutation  
+- provenance over convenience  
+
+If you are a new student inheriting this codebase:  
+**do not rewrite it — extend it.**
