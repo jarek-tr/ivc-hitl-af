@@ -58,6 +58,7 @@ class TaskSerializer(serializers.ModelSerializer):
             "task_definition",
             "status",
             "priority",
+            "assigned_to",
             "payload",
             "created_at",
         ]

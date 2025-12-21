@@ -1,0 +1,82 @@
+# Render.com deployment configuration
+# https://render.com/docs/blueprint-spec
+
+services:
+  # Django web application
+  - type: web
+    name: ivc-hitl-af-web
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: 0
+      - key: DJANGO_ALLOWED_HOSTS
+        value: "*"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ivc-hitl-af-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ivc-hitl-af-redis
+          property: connectionString
+      - key: PUBLIC_BASE_URL
+        fromService:
+          type: web
+          name: ivc-hitl-af-web
+          property: host
+    healthCheckPath: /api/health/
+    autoDeploy: true
+
+  # Celery worker
+  - type: worker
+    name: ivc-hitl-af-worker
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: celery -A ivc_hitl_af worker -l INFO -Q default,mturk --workdir backend
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ivc-hitl-af-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ivc-hitl-af-redis
+          property: connectionString
+    autoDeploy: true
+
+  # Celery beat scheduler
+  - type: worker
+    name: ivc-hitl-af-beat
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: celery -A ivc_hitl_af beat -l INFO --workdir backend
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ivc-hitl-af-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ivc-hitl-af-redis
+          property: connectionString
+    autoDeploy: true
+
+databases:
+  - name: ivc-hitl-af-db
+    databaseName: ivc_hitl_af
+    plan: starter  # $7/month
+
+services:
+  - type: redis
+    name: ivc-hitl-af-redis
+    plan: starter  # $10/month
+    maxmemoryPolicy: noeviction

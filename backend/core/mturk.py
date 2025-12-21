@@ -152,6 +152,8 @@ def _map_assignment_status(status: str) -> str:
         return "approved"
     if status == "rejected":
         return "rejected"
+    if status == "returned":
+        return "returned"
     if status == "expired":
         return "expired"
     return "submitted"
