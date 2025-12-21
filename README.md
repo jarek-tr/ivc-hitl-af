@@ -39,3 +39,47 @@
 - Annotations are idempotent via `submission_id` (use MTurk assignmentId or a stable client UUID). Duplicate submissions return HTTP 200 with the first Annotation payload.
 - Assignment rows capture raw MTurk payloads + ingestion timestamps for auditing.
 - Plugin manifests are validated against the `frontends/` directory before activation (required keys: name, task_type, version, root, js, result_schema_version).
+
+## Salient Polygon Plugin
+The `frontends/salient-poly` package ships the annotation UI for salient object segmentation. After cloning:
+
+1. **Build the bundle**
+   ```bash
+   cd frontends/salient-poly
+   npm install
+   npm run build
+   ```
+   Vite emits `dist/assets/index.js` and `dist/assets/index.css`, matching the manifest contract.
+
+2. **Register the plugin**
+   ```bash
+   python manage.py shell <<'PY'
+   import json
+   from core.models import TaskType, FrontendPlugin
+
+   task_type, _ = TaskType.objects.get_or_create(
+       slug="salient_poly",
+       defaults={"name": "Salient Object Segmentation"},
+   )
+   with open("frontends/salient-poly/manifest.json") as fh:
+       manifest = json.load(fh)
+   FrontendPlugin.objects.update_or_create(
+       task_type=task_type,
+       defaults={
+           "name": manifest["name"],
+           "version": manifest["version"],
+           "manifest": manifest,
+       },
+   )
+   PY
+   ```
+
+3. **Patch an Asset for testing**
+   Use any public JPG; the UI defaults to `https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80`.
+   ```bash
+   curl -X PATCH http://localhost:8000/api/assets/<asset_id>/ \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Token <api_token>" \
+     -d '{"metadata":{"image_url":"https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80"}}'
+   ```
+   Assign a `Task` that targets this asset + the `salient_poly` `TaskType`, then load the registered plugin to iterate rapidly.
