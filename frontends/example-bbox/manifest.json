@@ -1,0 +1,13 @@
+{
+  "name": "Example BBox Annotator",
+  "task_type": "bbox",
+  "version": "0.1.0",
+  "root": "example-bbox/dist",
+  "css": [
+    "assets/index.css"
+  ],
+  "js": [
+    "assets/index.js"
+  ],
+  "result_schema_version": "1.0.0"
+}
