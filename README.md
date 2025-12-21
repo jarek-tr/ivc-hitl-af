@@ -59,10 +59,17 @@ No frontend code is baked into Django.
    docker compose up -d web worker beat
    ```
 
-4. Visit API:
+4. Run migrations and load example data:
+   ```bash
+   docker compose exec web python manage.py migrate
+   docker compose exec web python manage.py load_examples
+   ```
+
+5. Visit API:
    - API root: http://localhost:8000/api/
    - OpenAPI schema: http://localhost:8000/api/schema/
    - Swagger UI: http://localhost:8000/api/docs/
+   - Example project stats: http://localhost:8000/api/projects/1/stats/
 
 ---
 
@@ -163,7 +170,68 @@ http://localhost:8000/api/tasks/<task_id>/annotate/
 
 ---
 
+## Example Datasets
+
+The system includes example datasets to help you get started:
+
+```bash
+# Load example projects with sample annotations
+python manage.py load_examples
+
+# Or use the CLI tool
+ivc-hitl-af load-examples
+
+# View loaded data
+curl http://localhost:8000/api/projects/1/stats/
+curl http://localhost:8000/api/projects/1/export/
+```
+
+The example dataset includes:
+- 3 projects (classification, bounding box, polygon annotation)
+- 6 assets with placeholder S3 keys
+- 6 tasks (2 per project)
+- 3 sample annotations demonstrating different result formats
+
+See [`backend/core/fixtures/README.md`](backend/core/fixtures/README.md) for complete documentation.
+
+---
+
+## CLI Tool
+
+The `ivc-hitl-af` CLI provides convenient commands for common operations:
+
+```bash
+# Initialize a new project
+ivc-hitl-af init-project --name "My Project" --slug "my-project"
+
+# Load example datasets
+ivc-hitl-af load-examples
+
+# Validate registered plugins
+ivc-hitl-af validate-plugins --strict
+
+# Register a new plugin
+ivc-hitl-af register-plugin frontends/my-plugin --task-type my-task
+
+# Export project annotations
+ivc-hitl-af export-annotations my-project --format json --output annotations.json
+
+# Sync MTurk HITs and assignments
+ivc-hitl-af sync-mturk --limit 50
+```
+
+---
+
+## Documentation
+
+- **[Architecture Guide](docs/architecture.md)** - Complete system documentation (1,179 lines)
+- **[Deployment Guide](docs/deployment.md)** - Production deployment for 6+ platforms
+- **[Plugin Development Guide](docs/plugin-guide.md)** - Build custom annotation UIs (802 lines)
+- **[Example Dataset Guide](backend/core/fixtures/README.md)** - Sample data and usage
+
+---
+
 ## Status
 
-This repository is intended as **shared lab infrastructure**, not a one-off project.  
+This repository is intended as **shared lab infrastructure**, not a one-off project.
 Design favors clarity, explicitness, and auditability over clever abstractions.

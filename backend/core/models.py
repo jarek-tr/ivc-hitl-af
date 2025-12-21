@@ -40,6 +40,40 @@ class Asset(models.Model):
             models.Index(fields=["project", "media_type"], name="asset_proj_media_idx"),
         ]
 
+    def presigned_url(self, expiration: int = 3600) -> str:
+        """
+        Generate a presigned S3 URL for this asset.
+
+        Args:
+            expiration: URL expiration time in seconds (default 1 hour)
+
+        Returns:
+            Presigned S3 URL
+
+        Raises:
+            ValueError: If S3_BUCKET setting is not configured
+            ImportError: If boto3 is not installed
+        """
+        from django.conf import settings
+        import boto3
+
+        if not hasattr(settings, 'S3_BUCKET') or not settings.S3_BUCKET:
+            raise ValueError('S3_BUCKET setting is required for presigned URLs')
+
+        if not self.s3_key:
+            raise ValueError(f'Asset {self.id} has no s3_key')
+
+        s3_client = boto3.client(
+            's3',
+            region_name=getattr(settings, 'AWS_REGION', 'us-east-1'),
+        )
+
+        return s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': settings.S3_BUCKET, 'Key': self.s3_key},
+            ExpiresIn=expiration,
+        )
+
 
 class TaskType(models.Model):
     slug = models.SlugField(unique=True)
@@ -81,6 +115,12 @@ class Task(models.Model):
     )
     status = models.CharField(max_length=20, choices=STATUS, default="pending")
     priority = models.IntegerField(default=0)
+    assigned_to = models.CharField(
+        max_length=128,
+        blank=True,
+        db_index=True,
+        help_text="Optional annotator assignment (username, email, or worker ID)."
+    )
     payload = models.JSONField(
         default=dict, blank=True, help_text="Per-task extra config."
     )
@@ -101,6 +141,7 @@ class Assignment(models.Model):
         ("submitted", "submitted"),
         ("approved", "approved"),
         ("rejected", "rejected"),
+        ("returned", "returned"),
         ("expired", "expired"),
     ]
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="assignments")
@@ -170,6 +211,7 @@ class Annotation(models.Model):
         indexes = [
             models.Index(fields=["task", "created_at"], name="anno_task_created_idx"),
             models.Index(fields=["submission_id"], name="anno_submission_idx"),
+            models.Index(fields=["actor"], name="anno_actor_idx"),
         ]
         constraints = [
             models.UniqueConstraint(

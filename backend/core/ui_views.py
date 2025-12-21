@@ -58,6 +58,10 @@ def annotate_task_shell(request, task_id: int):
 
 
 def plugin_asset(request, task_id: int, asset_path: str):
+    from django.conf import settings
+    from django.http import HttpResponseRedirect
+    import boto3
+
     task = get_object_or_404(
         Task.objects.select_related("task_definition__task_type"), pk=task_id
     )
@@ -66,20 +70,52 @@ def plugin_asset(request, task_id: int, asset_path: str):
     if not plugin or not plugin.is_active:
         raise Http404("No active plugin")
 
-    # Assets are addressed relative to a plugin root folder declared in manifest.
-    manifest = plugin.manifest or {}
-    plugin_root = manifest.get("root", "")
-    safe_root = (FRONTENDS_DIR / plugin_root).resolve()
-    safe_file = (safe_root / asset_path).resolve()
-
-    if not str(safe_file).startswith(str(safe_root)):
+    # Defense in depth: reject directory traversal attempts before path operations
+    if ".." in asset_path or asset_path.startswith("/"):
         raise Http404("Invalid path")
-    if not safe_file.exists() or not safe_file.is_file():
-        raise Http404("Missing asset")
 
-    mime, _ = mimetypes.guess_type(str(safe_file))
-    mime = mime or "application/octet-stream"
-    return HttpResponse(safe_file.read_bytes(), content_type=mime)
+    # Check if S3 plugin storage is enabled
+    use_s3 = getattr(settings, 'USE_S3_PLUGINS', False)
+
+    if use_s3:
+        # Serve from S3
+        s3_bucket = getattr(settings, 'PLUGIN_S3_BUCKET', None) or getattr(settings, 'S3_BUCKET', None)
+        if not s3_bucket:
+            raise Http404("S3 plugin storage not configured")
+
+        # Construct S3 key
+        task_type_slug = tt.slug
+        plugin_version = plugin.version
+        s3_key = f"plugins/{task_type_slug}/{plugin_version}/{asset_path}"
+
+        # Generate presigned URL
+        s3_client = boto3.client(
+            's3',
+            region_name=getattr(settings, 'AWS_REGION', 'us-east-1'),
+        )
+
+        presigned_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': s3_bucket, 'Key': s3_key},
+            ExpiresIn=3600,  # 1 hour
+        )
+
+        return HttpResponseRedirect(presigned_url)
+    else:
+        # Serve from local filesystem (dev mode)
+        manifest = plugin.manifest or {}
+        plugin_root = manifest.get("root", "")
+        safe_root = (FRONTENDS_DIR / plugin_root).resolve()
+        safe_file = (safe_root / asset_path).resolve()
+
+        if not str(safe_file).startswith(str(safe_root)):
+            raise Http404("Invalid path")
+        if not safe_file.exists() or not safe_file.is_file():
+            raise Http404("Missing asset")
+
+        mime, _ = mimetypes.guess_type(str(safe_file))
+        mime = mime or "application/octet-stream"
+        return HttpResponse(safe_file.read_bytes(), content_type=mime)
 
 
 def mturk_annotate_task(request, task_id: int):

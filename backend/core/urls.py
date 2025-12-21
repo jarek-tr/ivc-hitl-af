@@ -10,6 +10,7 @@ from .views import (
     PluginViewSet,
     AssignmentViewSet,
 )
+from .health import health_check, liveness, readiness
 
 router = DefaultRouter()
 router.register(r"projects", ProjectViewSet, basename="project")
@@ -24,4 +25,7 @@ router.register(r"plugins", PluginViewSet, basename="plugin")
 urlpatterns = [
     path("", include(router.urls)),
     path("tasks/<int:task_id>/annotate/", include("core.ui_urls")),
+    path("health/", health_check, name="health_check"),
+    path("health/liveness/", liveness, name="health_liveness"),
+    path("health/readiness/", readiness, name="health_readiness"),
 ]
