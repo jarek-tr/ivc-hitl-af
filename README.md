@@ -1,5 +1,5 @@
 # ivc-hitl-af
-**IVC Human-in-the-Loop Annotation Framework** — a durable, API-first backend + hot-swappable annotation frontends.
+**CU Boulder Computer Science Image and Video Computing Group (IVC) Human-in-the-Loop Annotation Framework** — a durable, API-first backend + hot-swappable annotation frontends.
 
 ## Goals
 - Long-lived research infrastructure for image/video annotation workflows (including MTurk-based pipelines)
@@ -11,27 +11,27 @@
 - Celery + Redis for background jobs (e.g., MTurk HIT creation / polling / ingestion)
 - S3 for assets and exports (recommended via presigned URLs)
 
-## Quick start (dev)
+## Quick Start (dev)
 1. Copy env:
    ```bash
    cp .env.example .env
    ```
-2. Start services:
+2. Start Services:
    ```bash
    docker compose up --build
    ```
-3. Visit API schema:
+3. Visit API Schema:
    - http://localhost:8000/api/schema/
    - Swagger UI: http://localhost:8000/api/docs/
 
-## Core concepts
+## Core Concepts
 - **TaskType**: logical annotation task (e.g., bbox, polygons, QA)
 - **TaskDefinition (versioned)**: JSON defining UI + labeling rules
 - **Task**: work unit tied to an Asset + TaskDefinition
 - **Annotation**: versioned result JSON submitted by a frontend
 - **FrontendPlugin**: a compiled UI bundle registered by manifest for a TaskType
 
-## MTurk + ingestion notes
+## MTurk + Ingestion Notes
 - Use the Celery tasks in `core.mturk` for MTurk operations:
   - `core.mturk.create_hits_for_tasks` (batch HIT creation with retries)
   - `core.mturk.sync_open_hits` (polls MTurk for assignment updates)
