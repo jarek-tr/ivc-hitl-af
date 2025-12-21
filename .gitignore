@@ -19,6 +19,11 @@ staticfiles/
 media/
 local_settings.py
 
+# Celery
+celerybeat-schedule
+celerybeat-schedule.db
+celerybeat.pid
+
 # ======================
 # Migrations cache
 # ======================
